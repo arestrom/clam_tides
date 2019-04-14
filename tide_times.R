@@ -70,21 +70,37 @@ Seattle_sp = SpatialPoints(Seattle, proj4string=CRS("+proj=longlat +datum=WGS84"
 
 # Explicitly convert timezones
 tide_times = tide_times %>%
-  mutate(tide_datetime = with_tz(tide_datetime, tzone = "America/Los_Angeles")) %>%
-  mutate(sunrise = sunriset(Seattle_sp, tide_datetime, direction="sunrise", POSIXct.out=TRUE)[,2]) %>%
-  mutate(sunset = sunriset(Seattle_sp, tide_datetime, direction="sunset", POSIXct.out=TRUE)[,2]) %>%
-  mutate(tide_datetime = format(tide_datetime)) %>%
-  mutate(tide_date = substr(tide_datetime, 1, 10)) %>%
-  select(tide_date, tide_station, tide_datetime, tide_time, tide_height, tide_strata, sunrise, sunset)
+  mutate(sea_tide_datetime = with_tz(tide_datetime, tzone = "America/Los_Angeles")) %>%
+  mutate(sunrise = sunriset(Seattle_sp, sea_tide_datetime, direction="sunrise", POSIXct.out=TRUE)[,2]) %>%
+  mutate(sunset = sunriset(Seattle_sp, sea_tide_datetime, direction="sunset", POSIXct.out=TRUE)[,2]) %>%
+  mutate(tide_date_char = substr(format(sea_tide_datetime), 1, 10)) %>%
+  mutate(tide_date = as.POSIXct(tide_date_char, tz = "America/Los_Angeles")) %>%
+  mutate(tide_year = as.integer(substr(tide_date_char, 1, 4))) %>%
+  # Get rid of extra entries owing to UTC vs PDT
+  filter(between(tide_year, 2000L, 2056L)) %>%
+  select(tide_date, tide_station, sea_tide_datetime, tide_time, tide_height, tide_strata, sunrise, sunset)
+
+# Check....perfect
+head(tide_times)
+tail(tide_times)
 
 # Check if any tide_times strata differ by date...should only be Seattle strata...All Ok
 time_check = tide_times %>%
-  select(tide_date, tide_strata) %>%
+  select(sea_tide_datetime, tide_strata, tide_station) %>%
   distinct() %>%
-  group_by(tide_date) %>%
+  group_by(sea_tide_datetime, tide_station) %>%
   mutate(n_seq = row_number()) %>%
   ungroup() %>%
-  filter(n_seq > 1)
+  filter(n_seq > 1) %>%
+  left_join(tide_times, by = c("sea_tide_datetime", "tide_station"))
+
+# # Tide datetime is for Seattle. Only tide_time differs (minutes) compute tide_datetime for PT
+# # Decided there's no need. Just do computation in App as needed
+# pt_times = tide_times %>%
+#   select(tide_date, sea_tide_datetime, tide_station, tide_time) %>%
+#   filter(tide_station == "Port Townsend") %>%
+#   mutate(pt_tide_datetime = tide_date + minutes(tide_time)) %>%
+#   select(tide_date, sea_tide_datetime, pt_tide_datetime, tide_time)
 
 # Get the tide correction data
 qry = glue("select distinct bb.beach_number as bidn, b.local_beach_name as beach_name, ",
