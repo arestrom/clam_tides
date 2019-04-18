@@ -261,7 +261,7 @@ dygraph(dy_pred, height = "200px") %>%
 # combined_locations = rbind(wa_beach, wa_non_beach)
 
 #============================================================
-# Output data for single selected beach
+# Output predicted data for single selected beach
 #============================================================
 
 # Pull out single_select station or beach
@@ -283,6 +283,23 @@ tide_minutes = tide_pred %>%
   mutate(tide_height = round(pred_height, 2)) %>%
   filter(between(tide_datetime, calc_start, calc_end)) %>%
   select(bidn, beach_name, tide_date, tide_time, tide_height)
+
+#============================================================
+# Output high-low for single selected beach on map page
+#============================================================
+
+# Output table of high and low tides with sunrise, sunset, tide strata
+map_high_low = tide_times %>%
+  filter(tide_station == selected_station$station_name) %>%
+  mutate(lt_corr = selected_station$low_correction) %>%
+  mutate(tide_time = tide_time + lt_corr) %>%
+  mutate(tide_date = as.Date(tide_date)) %>%
+  filter(between(tide_date, selected_start, selected_end)) %>%
+  mutate(sunrise = strftime(sunrise, format = "%H:%M")) %>%
+  mutate(sunset = strftime(sunset, format = "%H:%M")) %>%
+  mutate(tide_datetime = tide_date + minutes(tide_time)) %>%
+  select(tide_date, tide_datetime, station_name, sea_tide_datetime, tide_time,
+         tide_height, tide_strata, sunrise, sunset)
 
 #=========================================================================
 # End of predictions....rest is just from database

@@ -64,10 +64,10 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
 
                                   ),
                                   column(width = 7,
-                                         # verbatimTextOutput("check_val"),
-                                         tableOutput("tides"),
+                                         verbatimTextOutput("check_val"),
                                          dygraphOutput("tide_graph", height = "300px"),
                                          br(),
+                                         tableOutput("tides"),
                                          br(),
                                          div(DT::DTOutput("map_high_low"), style = "font-size: 80%")
 

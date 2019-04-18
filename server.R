@@ -2,10 +2,15 @@
 
 #===========================================================================================
 # Notes:
+#  1. Input to rtide::tide_height() must be class Date.
+#  2. as.Date() converts everything to UTC
+#  3. Output from rtide::tide_height() is a POSIXct object in timezone tz
 #
 #
 #  ToDo:
-#  1.
+#  1. Add station tide time to map_high_low
+#  2. Add correction = zero to all stations lower than 200000
+#  3. Test that output from stations compute correctly.
 #
 # AS 2019-04-02
 #===========================================================================================
@@ -44,7 +49,7 @@ shinyServer(function(input, output, session) {
     req(input$map_beach_select)
     beach_data %>%
       filter(beach_name == input$map_beach_select) %>%
-      select(station_name, low_correction)
+      select(beach_name, station_name, low_correction)
   })
 
   time_interval = reactive({
@@ -174,17 +179,25 @@ shinyServer(function(input, output, session) {
     tide_times %>%
       filter(tide_station == map_station()$station_name) %>%
       mutate(tide_date = as.Date(tide_date)) %>%
-      filter(between(tide_date, input$map_date_one, input$map_date_one)) %>%
+      mutate(beach_name = map_station()$beach_name) %>%
+      mutate(tide_corr = map_station()$low_correction) %>%
+      filter(between(tide_date, input$map_date_one, input$map_date_two)) %>%
+      mutate(beach_time = tide_time + tide_corr) %>%
+      mutate(char_date = format(tide_date)) %>%
+      mutate(beach_date = as.POSIXct(char_date, tz = "America/Los_Angeles")) %>%
+      mutate(beach_datetime = beach_date + minutes(beach_time)) %>%
+      mutate(beach_datetime = format(beach_datetime)) %>%
       mutate(sunrise = strftime(sunrise, format = "%H:%M")) %>%
       mutate(sunset = strftime(sunset, format = "%H:%M")) %>%
-      select(tide_date, tide_station, sea_tide_datetime, tide_time,
-             tide_height, tide_strata, sunrise, sunset)
+      select(tide_date, beach_name, tide_station, sea_tide_datetime, tide_time,
+             tide_corr, beach_time, char_date, beach_datetime, tide_height,
+             tide_strata, sunrise, sunset)
   })
 
 
 
 
-  #output$check_val = renderText(input$map_beach_select)
+  output$check_val = renderText(tz(input$map_date_one))
   #output$check_val = renderText(unlist(start_pad()))
 
   output$tides = renderTable(
