@@ -5,7 +5,7 @@
 #================================================================
 
 # Read sites
-sites = readRDS("www/sites.rds")
+sites = readRDS("sites.rds")
 
 # filter to only those I need
 wa_sites = sites %>%
@@ -65,5 +65,51 @@ wa_beaches = beach_polys %>%
   select(bidn, beach_name, low_correction = lt_corr,
          station_name = tide_station, geometry)
 
-# # Output wa_beaches to rds
+# Pull out needed data from wa_stations
+wa_non_beach = wa_sites %>%
+  st_drop_geometry() %>%
+  mutate(beach_name = station_name) %>%
+  mutate(low_correction = 0L) %>%
+  select(bidn, beach_name, low_correction, station_name)
+
+# Add beach predictions high and low
+wa_beach = wa_beaches %>%
+  st_drop_geometry() %>%
+  select(bidn, beach_name, low_correction, station_name)
+
+# Pull out combined locations
+beaches_stations = rbind(wa_beach, wa_non_beach)
+
+# Arrange
+beaches_stations = beaches_stations %>%
+  arrange(beach_name)
+
+# # Output to rds
 # saveRDS(wa_beaches, "www/wa_beaches.rds")
+# saveRDS(beaches_stations, "www/beaches_stations.rds")
+
+# Prep select inputs
+station_list = beaches_stations %>%
+  filter(as.integer(bidn) < 200000) %>%
+  select(beach_name) %>%
+  arrange(beach_name)
+station_list = as.list(station_list$beach_name)
+
+# Prep select inputs
+beach_list = beaches_stations %>%
+  filter(as.integer(bidn) >= 200000) %>%
+  select(beach_name) %>%
+  arrange(beach_name)
+beach_list = as.list(beach_list$beach_name)
+
+# Create selectize list for multiple high-low sites
+beach_list = list("Beaches" = beach_list,
+                  `Tide stations` = station_list)
+
+
+
+
+
+
+
+

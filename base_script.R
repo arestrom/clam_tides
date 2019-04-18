@@ -8,7 +8,7 @@
 #
 #
 #  ToDo:
-#  1.
+#  1. Create reactives and tie in inputs with reactives
 #
 # AS 2019-04-02
 #===========================================================================================
@@ -41,8 +41,43 @@ options(shiny.maxRequestSize=10*1024^2)
 
 # Read .rds tide data
 tide_times = readRDS("www/tide_times.rds")
+tide_corr = readRDS("www/tide_corr.rds")
 wa_beaches = readRDS("www/wa_beaches.rds")
 wa_stations = readRDS("www/wa_stations.rds")
+beaches_stations = readRDS("www/beaches_stations.rds")
+
+# Prep select inputs
+station_list = beaches_stations %>%
+  filter(as.integer(bidn) < 200000) %>%
+  select(beach_name) %>%
+  arrange(beach_name)
+station_list = as.list(station_list$beach_name)
+
+# Prep select inputs
+beach_list = beaches_stations %>%
+  filter(as.integer(bidn) >= 200000) %>%
+  mutate(beach_name = paste0(beach_name, " (", bidn, ")")) %>%
+  select(beach_name) %>%
+  arrange(beach_name)
+beach_list = as.list(beach_list$beach_name)
+
+# Create selectize list for multiple high-low sites
+beach_list = list(`Tide stations` = station_list,
+                  "Beaches" = beach_list)
+
+# Create beach data for matching select input with corrections
+beach_data = beaches_stations %>%
+  mutate(beach_name = if_else(as.integer(bidn) > 200000L,
+                              paste0(beach_name, " (", bidn, ")"),
+                              beach_name))
+
+# Create dataset of sunrise and sunset times
+sun_times = tide_times %>%
+  select(datetime = tide_date, sunrise, sunset)
+
+# Data needed for sunrise sunset calculations
+seattle_mat = matrix(c(-122.3383, 47.605), nrow=1)
+seattle_sp = SpatialPoints(seattle_mat, proj4string=CRS("+proj=longlat +datum=WGS84"))
 
 #======================================================================
 # Define functions
@@ -99,7 +134,7 @@ m = leaflet(wa_beaches) %>%
 m
 
 # Select the station
-selected_bidn = "270170"
+selected_beach_name = "Port Townsend"
 #selected_bidn = "100000"
 
 # Select the unit
@@ -107,33 +142,21 @@ selected_bidn = "270170"
 selected_unit = "feet"
 
 # Select the interval for predictions in minutes
-selected_interval = 10L
+selected_interval = 15L
 
 # Select the date
-selected_start = "2019-04-13"
-selected_end = "2019-04-14"
+selected_start = as.Date("2019-04-17")
+selected_end = as.Date("2019-04-18")
 
-# Get the tide_station data
-if (selected_bidn %in% wa_beaches$bidn) {
-  station_data = wa_beaches %>%
-    st_drop_geometry() %>%
-    filter(bidn == selected_bidn) %>%
-    select(station_name, lt_corr = low_correction)
-} else {
-  station_data = wa_stations %>%
-    st_drop_geometry() %>%
-    mutate(lt_corr = 0L) %>%
-    select(station_name, lt_corr)
-}
-
-# Pull out tide_station
-selected_station = station_data$station_name
+selected_station = beach_data %>%
+    filter(beach_name == selected_beach_name) %>%
+    select(station_name, low_correction)
 
 tide_data = rtide::tide_height(
-    selected_station,
+    selected_station$station_name,
     # Pad one day at either end
-    from = as.Date(selected_start) - 1,
-    to = as.Date(selected_end) + 1,
+    from = selected_start,
+    to = selected_end,
     minutes = selected_interval,
     tz = "America/Los_Angeles")
 
@@ -170,8 +193,7 @@ dy_list = dy_pred %>%
   mutate(daytime = if_else(datetime >= sunrise & datetime < sunset, "light", "dark"))
 
 # Identify breaks between day and night in dy_list
-i = 1
-dy_list$daybreak = 0L
+dy_list$daybreak = 0L; i = 1
 while (i <= length(dy_list$daybreak)) {
   if (dy_list$daytime[i] == "dark" & i == 1L) {
     dy_list$daybreak[i] = 0L
@@ -186,15 +208,15 @@ while (i <= length(dy_list$daybreak)) {
   i = i + 1
 }
 
+# Trim to only needed dates
+dy_list_trim = dy_list %>%
+  filter(daytime == "light" & daybreak == 1L)
+
 # Calculate shading intervals as a list
-day_time = dy_list$datetime[dy_list$daybreak == 1L & dy_list$daytime == "light"]
-ok_periods = 0
-i=1
-j=1
-while (i < (length(dy_list) - 1)){
-  ok_periods[j] = list(list(from = day_time[i], to = day_time[i + 1]))
-  i = i + 2
-  j = j + 1
+ok_periods = 0; i=1; j=1
+while (i <= (length(dy_list_trim$daybreak) - 1)){
+  ok_periods[j] = list(list(from = dy_list_trim$datetime[i], to = dy_list_trim$datetime[i + 1]))
+  i = i + 2; j = j + 1
 }
 
 # Prep for dygraph
@@ -219,31 +241,31 @@ dygraph(dy_pred, height = "200px") %>%
   add_shades(ok_periods, color = "#FFFFCC" ) %>%
   dyLegend()
 
-#=====================================================
-# Generate table of all beaches and stations
-#=====================================================
-
-# Pull out needed data from wa_stations
-wa_non_beach = wa_stations %>%
-  st_drop_geometry() %>%
-  mutate(beach_name = station_name) %>%
-  mutate(low_correction = 0L) %>%
-  select(bidn, beach_name, low_correction, station_name)
-
-# Add beach predictions high and low
-wa_beach = wa_beaches %>%
-  st_drop_geometry() %>%
-  select(bidn, beach_name, low_correction, station_name)
-
-# Pull out combined locations
-combined_locations = rbind(wa_beach, wa_non_beach)
+# #=====================================================
+# # Generate table of all beaches and stations
+# #=====================================================
+#
+# # Pull out needed data from wa_stations
+# wa_non_beach = wa_stations %>%
+#   st_drop_geometry() %>%
+#   mutate(beach_name = station_name) %>%
+#   mutate(low_correction = 0L) %>%
+#   select(bidn, beach_name, low_correction, station_name)
+#
+# # Add beach predictions high and low
+# wa_beach = wa_beaches %>%
+#   st_drop_geometry() %>%
+#   select(bidn, beach_name, low_correction, station_name)
+#
+# # Pull out combined locations
+# combined_locations = rbind(wa_beach, wa_non_beach)
 
 #============================================================
-# Add data for selected beach
+# Output data for single selected beach
 #============================================================
 
 # Pull out single_select station or beach
-single_station = combined_locations %>%
+single_station = beaches_stations %>%
   distinct() %>%
   filter(bidn %in% selected_bidn) %>%
   select(bidn, beach_name)
@@ -257,7 +279,7 @@ tide_minutes = tide_pred %>%
   mutate(bidn = selected_bidn) %>%
   left_join(single_station, by = "bidn") %>%
   mutate(tide_date = strftime(tide_datetime, format = "%a %B %d, %Y")) %>%
-  mutate(tide_time = strftime(tide_datetime, format = "%H:%M %p")) %>%
+  mutate(tide_time = strftime(tide_datetime, format = "%H:%M")) %>%
   mutate(tide_height = round(pred_height, 2)) %>%
   filter(between(tide_datetime, calc_start, calc_end)) %>%
   select(bidn, beach_name, tide_date, tide_time, tide_height)
@@ -293,34 +315,18 @@ multi_station = combined_locations %>%
 # Add the high-low data
 multi_station = multi_station %>%
   left_join(tide_high_low, by = "tide_station") %>%
-  mutate(beach_time_minutes = tide_time + low_correction) %>%
-  mutate(low_tide_at_beach = tide_date + minutes(beach_time_minutes)) %>%
-  mutate(low_tide_at_beach = strftime(low_tide_at_beach, format = "%H:%M")) %>%
-  mutate(low_tide_at_station = tide_date + minutes(tide_time)) %>%
-  mutate(low_tide_at_station = strftime(low_tide_at_station, format = "%H:%M")) %>%
+  mutate(beach_minutes = tide_time + low_correction) %>%
+  mutate(low_tide = tide_date + minutes(beach_minutes)) %>%
+  mutate(low_tide = strftime(low_tide, format = "%H:%M")) %>%
+  mutate(station_tide = tide_date + minutes(tide_time)) %>%
+  mutate(station_tide = strftime(station_tide, format = "%H:%M")) %>%
   mutate(beach = paste0(beach_name, " (", bidn, ")")) %>%
-  select(tide_date, beach, low_tide_at_beach, tide_height_at_station = tide_height,
-         tide_strata, sunrise, sunset, tide_station, low_tide_at_station,
-         station_time_minutes = tide_time, low_tide_correction = low_correction,
-         beach_time_minutes) %>%
+  select(tide_date, beach, low_tide, tide_height,
+         tide_strata, sunrise, sunset, tide_station, station_tide,
+         station_minutes = tide_time, low_correction,
+         beach_minutes) %>%
   filter(tide_strata %in% selected_strata) %>%
-  arrange(tide_date, beach, low_tide_at_beach)
-
-
-# mutate(tide_date = strftime(tide_date, format = "%a %B %d, %Y")) %>%
-
-# # Verify between
-# x = as.POSIXct("2019-04-11", tz = "America/Los_Angeles")
-# y = as.POSIXct("2019-04-19", tz = "America/Los_Angeles")
-# dts = tibble(survey_date = seq(x, y, by = 30))
-# head(dts)
-#
-# strt = as.POSIXct("2019-04-12", tz = "America/Los_Angeles")
-# end = as.POSIXct("2019-04-13", tz = "America/Los_Angeles") - 1
-#
-# # Identify end points...between will include the end_point
-# dts_between = dts %>%
-#   filter(between(survey_date, strt, end))
+  arrange(tide_date, beach, low_tide)
 
 
 

@@ -11,20 +11,39 @@
 shinyUI(navbarPage(theme = shinytheme("sandstone"),
                    "Clam Tides",
                    id = "tab_being_displayed",
-                   tabPanel("Map View",
+                   tabPanel("Tide plot",
                             sidebarLayout(
                               sidebarPanel(width = 2,
+
+                                           # # Set height of inputs
+                                           # tags$style(".shiny-input-container  {line-height: 5px; height : 25px}"),
+                                           # tags$style(".form-control  {height: 25px;}"),
+
                                            # Select beach
-                                           div(selectizeInput(inputId = "clam_beach", label = "Select beach",
-                                                              choices = tide_corr$beach_name),
-                                               style = "font-size: 80%; height: 40px;"),
-                                           div(dateInput(inputId = "tide_date", label = "Select the date",
-                                                         value = Sys.Date(), format = "mm/dd/yy",
-                                                         min = "2000-01-01", max = "2056-12-31"),
-                                               style = "font-size: 80%; height: 200px"),
+                                           selectizeInput(inputId = "map_beach_select",
+                                                          label = "Predict tide for:",
+                                                          choices = beach_list,
+                                                          selected = "Port Townsend"),
+                                           dateInput(inputId = "map_date_one",
+                                                          label = "From:",
+                                                          format = "D M dd yyyy",
+                                                          value = Sys.Date()),
+                                           dateInput(inputId = "map_date_two",
+                                                     label = "To:",
+                                                     format = "D M dd yyyy",
+                                                     value = Sys.Date()),
+                                           radioButtons(inputId = "map_tide_unit",
+                                                        label = "Units",
+                                                        choices = c("feet", "meters"),
+                                                        selected = "feet",
+                                                        inline = TRUE),
+                                           selectizeInput(inputId = "time_interval",
+                                                          label = "Time interval (minutes)",
+                                                          choices = c(1, 6, 15, 30, 60),
+                                                          selected = 15),
                                            br(),
                                            br(),
-                                           img(src = "clam_flight.jpg", width = "75%"),
+                                           img(src = "buster.jpg", width = "75%"),
                                            br(),
                                            br(),
                                            img(src = "wdfw.png", width = "75%")
@@ -37,34 +56,53 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
                                 ),
                                 fluidRow(
 
-                                  column(width = 5,
+                                  column(width = 4,
                                          # map output height 655
-                                         leafletOutput("beach_map", height = 650)
-                                  ),
-                                  column(width = 7,
-                                         div(DT::DTOutput("tide_graph"), style = "font-size: 80%"),
+                                         leafletOutput("beach_map", height = 550),
                                          br(),
                                          div(DT::DTOutput("tide_report"), style = "font-size: 80%")
+
+                                  ),
+                                  column(width = 7,
+                                         # verbatimTextOutput("check_val"),
+                                         tableOutput("tides"),
+                                         dygraphOutput("tide_graph", height = "300px"),
+                                         br(),
+                                         br(),
+                                         div(DT::DTOutput("map_high_low"), style = "font-size: 80%")
+
                                   )
                                 )
                               )
                             )
                    ),
-                   tabPanel("Historical",
+                   tabPanel("High-Low only",
                             sidebarLayout(
-                              sidebarPanel(width = 2,
+                              sidebarPanel(width = 3,
                                      # Select primary tide stations in WA
-                                     selectizeInput(inputId = "primary_stations", label = "Select the tide station",
-                                                    choices = c("Seattle" = "seattle",
-                                                                "Port Townsend" = "port_townsend"),
-                                                    selected = "seattle"),
-                                     dateRangeInput(inputId = "tide_range", label = "Select date range to export",
-                                               format = "mm/dd/yy",
-                                               start = paste0(format(Sys.Date(), format = "%Y"), "-01-01"),
-                                               end = paste0(format(Sys.Date(), format = "%Y"), "-12-31"),
-                                               min = "2000-01-01", max = "2056-12-31")
+                                     selectizeInput(inputId = "out_beach_select",
+                                                    label = "High-Low for:",
+                                                    multiple = TRUE,
+                                                    choices = beach_list,
+                                                    selected = "Seattle"),
+                                     dateRangeInput(inputId = "out_tide_range",
+                                                    label = "From (no limit)",
+                                                    format = "D M dd yyyy",
+                                                    start = paste0(format(Sys.Date(), format = "%Y"), "-03-01"),
+                                                    end = paste0(format(Sys.Date(), format = "%Y"), "-09-01"),
+                                                    min = "1970-01-01", max = "2056-12-31"),
+                                     radioButtons(inputId = "out_tide_unit",
+                                                  label = "Units",
+                                                  choices = c("Feet", "Meters"),
+                                                  selected = "Feet",
+                                                  inline = TRUE),
+                                     selectizeInput(inputId = "out_strata",
+                                                    label = "Tide strata",
+                                                    multiple = TRUE,
+                                                    choices = c("ELOW", "LOW", "HIGH", "PLUS", "XPLUS", "NIGHT"),
+                                                    selected = c("ELOW", "HIGH", "LOW"))
                               ),
-                              mainPanel(width = 10,
+                              mainPanel(width = 9,
                                      # Table showing tide predictions
                                      div(DT::DTOutput("tide_range_report"), style = "font-size: 80%")
                               )
