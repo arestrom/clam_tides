@@ -148,6 +148,9 @@ selected_interval = 15L
 selected_start = as.Date("2019-04-17")
 selected_end = as.Date("2019-04-18")
 
+selected_start = as.POSIXct("2019-04-17", tz = "")
+selected_end = as.POSIXct("2019-04-18", tz = "")
+
 selected_station = beach_data %>%
     filter(beach_name == selected_beach_name) %>%
     select(station_name, low_correction)

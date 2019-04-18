@@ -37,7 +37,11 @@ wa_beaches = readRDS("www/wa_beaches.rds")
 wa_stations = readRDS("www/wa_stations.rds")
 beaches_stations = readRDS("www/beaches_stations.rds")
 
-# Prep select inputs
+#===================================================
+# Inputs for map tab
+#===================================================
+
+# Prep select inputs for map tab
 station_list = beaches_stations %>%
   filter(as.integer(bidn) < 200000) %>%
   select(beach_name) %>%
@@ -56,6 +60,31 @@ beach_list = as.list(beach_list$beach_name)
 beach_list = list(`Tide stations` = station_list,
                   "Beaches" = beach_list)
 
+#===================================================
+# Inputs for high-low tab
+#===================================================
+
+# Prep select inputs for map tab
+high_station_list = beaches_stations %>%
+  filter(as.integer(bidn) < 200000) %>%
+  select(beach_name) %>%
+  filter(beach_name %in% c("Port Townsend", "Seattle")) %>%
+  arrange(beach_name)
+high_station_list = as.list(high_station_list$beach_name)
+
+# Prep select inputs
+high_beach_list = beaches_stations %>%
+  filter(as.integer(bidn) >= 200000) %>%
+  mutate(beach_name = paste0(beach_name, " (", bidn, ")")) %>%
+  select(beach_name) %>%
+  arrange(beach_name)
+high_beach_list = as.list(high_beach_list$beach_name)
+
+# Create selectize list for multiple high-low sites
+high_beach_list = list(`Tide stations` = high_station_list,
+                  "Beaches" = high_beach_list)
+
+
 # Create beach data for matching select input with corrections
 beach_data = beaches_stations %>%
   mutate(beach_name = if_else(as.integer(bidn) > 200000L,
@@ -69,6 +98,10 @@ sun_times = tide_times %>%
 # Data needed for sunrise sunset calculations
 seattle_mat = matrix(c(-122.3383, 47.605), nrow=1)
 seattle_sp = SpatialPoints(seattle_mat, proj4string=CRS("+proj=longlat +datum=WGS84"))
+
+# Create label for wa_beaches
+wa_beaches = wa_beaches %>%
+  mutate(beach_label = paste0(beach_name, " (", bidn, ")"))
 
 #======================================================================================
 # Define functions

@@ -10,7 +10,8 @@ sites = readRDS("sites.rds")
 # filter to only those I need
 wa_sites = sites %>%
   filter(Y > 46.21 & Y < 49.1 & X > -124.76 & X < -121.91) %>%
-  select(station = Station, lon = X, lat = Y)
+  select(station = Station, lon = X, lat = Y) %>%
+  filter(!station == "Aberdeen, Grays Harbor, Washington") # Something weird with this one
 
 # Convert to sf object...no need for time-zone info
 wa_sites = st_as_sf(wa_sites, coords = c("lon", "lat"), crs = 4326)

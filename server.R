@@ -5,14 +5,16 @@
 #  1. Input to rtide::tide_height() must be class Date.
 #  2. as.Date() converts everything to UTC
 #  3. Output from rtide::tide_height() is a POSIXct object in timezone tz
-#
+#  4. Tested all meter to feet conversion values. Current five decimal
+#     value seems most appropriate to match noaa predictions. Only some
+#     rounding error difference at 0.01.
 #
 #  ToDo:
-#  1. Add station tide time to map_high_low
-#  2. Add correction = zero to all stations lower than 200000
-#  3. Test that output from stations compute correctly.
+#  1. Add station tide time to map_high_low...Done
+#  2. Add correction = zero to all stations lower than 200000...Done
+#  3. Test that output from stations compute correctly...Done
 #
-# AS 2019-04-02
+# AS 2019-04-18
 #===========================================================================================
 
 # Server code
@@ -21,12 +23,13 @@ shinyServer(function(input, output, session) {
   # Output leaflet bidn map
   output$beach_map <- renderLeaflet({
     m = leaflet() %>%
-      setView(-122.72, 48, zoom = 10) %>%
+      setView(-122.72, 48.0, zoom = 8) %>%
       #fitBounds(-122.12, 47.0, -123.23, 49.0) %>%
       addPolygons(data = wa_beaches,
                   group = "Beaches",
                   fillOpacity = 0.4,
-                  label = ~paste0(beach_name, " (", bidn, ")"),
+                  label = ~beach_label,
+                  layerId = ~beach_label,
                   labelOptions = labelOptions(noHide = FALSE),
                   highlightOptions = highlightOptions(color = "white", weight = 2,
                                                       bringToFront = TRUE)) %>%
@@ -34,6 +37,7 @@ shinyServer(function(input, output, session) {
                  group = "Tide stations",
                  #clusterOptions = markerClusterOptions(),
                  label = ~station_name,
+                 layerId = ~station_name,
                  labelOptions = labelOptions(noHide = FALSE)) %>%
       addProviderTiles("Esri.WorldImagery", group = "Esri World Imagery") %>%
       addProviderTiles("Esri.OceanBasemap", group = "Esri Ocean basemap") %>%
@@ -45,6 +49,34 @@ shinyServer(function(input, output, session) {
     m
   })
 
+  # map_station reactive value
+  map_location <- reactiveValues(map_beach = NULL)
+
+  # Observer to record drop-down selection
+  observeEvent(input$map_beach_select, {
+    map_location$map_beach = input$map_beach_select
+  })
+
+  # Observer to record polygon map click
+  observeEvent(input$beach_map_shape_click, {
+    map_location$map_beach = input$beach_map_shape_click
+  })
+
+  # Observer to record marker map click
+  observeEvent(input$beach_map_marker_click, {
+    map_location$map_beach = input$beach_map_marker_click
+  })
+
+  # Update selectizeInput
+  observe({
+    selected_map_location = map_location$map_beach[[1]]
+    # Update
+    updateSelectizeInput(session, "map_beach_select",
+                         choices = beach_list,
+                         selected = selected_map_location)
+  })
+
+  # Filter to selected beach
   map_station = reactive({
     req(input$map_beach_select)
     beach_data %>%
@@ -62,7 +94,7 @@ shinyServer(function(input, output, session) {
     req(input$map_date_two)
     validate(
       need(input$map_date_two >= input$map_date_one,
-           "Error: End date must be greater than the start date.")
+           "Error: End date must be greater than or equal to the start date.")
     )
     rtide::tide_height(
       stations = map_station()$station_name,
@@ -77,15 +109,15 @@ shinyServer(function(input, output, session) {
   tide_pred = reactive({
     req(input$map_tide_unit)
     tide_data() %>%
-    mutate(station_name = map_station()$station_name) %>%
-    mutate(selected_unit = input$map_tide_unit) %>%
-    mutate(pred_height = if_else(selected_unit == "feet",
-                                   TideHeight * 3.28, TideHeight)) %>%
-    mutate(pred_height = round(pred_height, 3)) %>%
-    mutate(beach_name = input$map_beach_select) %>%
-    mutate(low_correction = map_station()$low_correction) %>%
-    mutate(tide_datetime = DateTime + minutes(low_correction)) %>%
-    select(beach_name, station_name, tide_datetime, pred_height)
+      mutate(station_name = map_station()$station_name) %>%
+      mutate(selected_unit = input$map_tide_unit) %>%
+      mutate(pred_height = if_else(selected_unit == "feet",
+                                   TideHeight * 3.28084, TideHeight)) %>%
+      mutate(pred_height = round(pred_height, 2)) %>%
+      mutate(beach_name = input$map_beach_select) %>%
+      mutate(low_correction = map_station()$low_correction) %>%
+      mutate(tide_datetime = DateTime + minutes(low_correction)) %>%
+      select(beach_name, station_name, tide_datetime, pred_height)
   })
 
   dy_pred = reactive({
@@ -129,7 +161,8 @@ shinyServer(function(input, output, session) {
 
   # Reactive for dygraph
   tide_plot = reactive({
-    dygraph(dy_input(), height = "10px") %>%
+    graph_title = glue("Tide height ({input$map_tide_unit}) in {time_interval()} min increments for {input$map_beach_select}")
+    dygraph(dy_input(), main = graph_title, height = "10px") %>%
       dyOptions(strokeWidth = 1.5, drawGrid = F, includeZero = F,
                 useDataTimezone = T, drawGapEdgePoints = T, rightGap = 15) %>%
       dyRangeSelector() %>%
@@ -151,17 +184,17 @@ shinyServer(function(input, output, session) {
       mutate(tide_date = strftime(tide_datetime, format = "%a %B %d, %Y")) %>%
       mutate(tide_time = strftime(tide_datetime, format = "%H:%M")) %>%
       mutate(tide_height = round(pred_height, 2)) %>%
-      select(tide_date, tide_time, tide_height)
+      select(tide_date, beach = beach_name, tide_time, tide_height)
   })
 
   # Output daily predicted tides
   output$tide_report = renderDT({
-    tide_title = glue("Tide prediction for {input$map_beach_select}")
+    tide_title = glue("Tide height ({input$map_tide_unit}) in {time_interval()} min increments for {input$map_beach_select}")
     # Generate table
     datatable(tide_rep(),
               extensions = 'Buttons',
               options = list(dom = 'Blftp',
-                             pageLength = 5,
+                             pageLength = 10,
                              lengthMenu = c(5, 10, 20, 40, 60, 100, 500, 5000),
                              scrollX = T,
                              buttons = c('excel', 'print'),
@@ -174,41 +207,112 @@ shinyServer(function(input, output, session) {
                 'Table 1: ', htmltools::em(htmltools::strong(tide_title))))
   })
 
-  # Get highs and lows for map page
-  map_high_low = reactive({
+  # # Get highs and lows for map page
+  # map_high_low = reactive({
+  #   tide_times %>%
+  #     filter(tide_station == map_station()$station_name) %>%
+  #     mutate(tide_date = as.Date(tide_date)) %>%
+  #     mutate(beach = map_station()$beach_name) %>%
+  #     mutate(tide_corr = map_station()$low_correction) %>%
+  #     filter(between(tide_date, input$map_date_one, input$map_date_two)) %>%
+  #     mutate(beach_time = tide_time + tide_corr) %>%
+  #     mutate(char_date = format(tide_date)) %>%
+  #     mutate(beach_date = as.POSIXct(char_date, tz = "America/Los_Angeles")) %>%
+  #     mutate(beach_datetime = beach_date + minutes(beach_time)) %>%
+  #     mutate(beach_tide = strftime(beach_datetime, format = "%H:%M")) %>%
+  #     mutate(station_tide = beach_date + minutes(tide_time)) %>%
+  #     mutate(station_tide = strftime(station_tide, format = "%H:%M")) %>%
+  #     mutate(sunrise = strftime(sunrise, format = "%H:%M")) %>%
+  #     mutate(sunset = strftime(sunset, format = "%H:%M")) %>%
+  #     select(tide_date, beach, beach_tide, sunrise, sunset,
+  #            strata = tide_strata, station = tide_station,
+  #            station_tide, low_correction = tide_corr)
+  # })
+  #
+  # # Output daily predicted tides
+  # output$map_high_low = renderDT({
+  #   tide_title = glue("High and low tides ({input$map_tide_unit}) for {input$map_beach_select}")
+  #   # Generate table
+  #   datatable(map_high_low(),
+  #             extensions = 'Buttons',
+  #             options = list(dom = 'Blftp',
+  #                            pageLength = 10,
+  #                            lengthMenu = c(5, 10, 20, 40, 60, 100, 500, 5000),
+  #                            scrollX = T,
+  #                            buttons = c('excel', 'print'),
+  #                            initComplete = JS(
+  #                              "function(settings, json) {",
+  #                              "$(this.api().table().header()).css({'background-color': '#9eb3d6'});",
+  #                              "}")),
+  #             caption = htmltools::tags$caption(
+  #               style = 'caption-side: top; text-align: left; color: black;',
+  #               'Table 2: ', htmltools::em(htmltools::strong(tide_title))))
+  # })
+
+  # Output table of high and low tides with sunrise, sunset, tide strata
+  high_low = reactive({
     tide_times %>%
-      filter(tide_station == map_station()$station_name) %>%
       mutate(tide_date = as.Date(tide_date)) %>%
-      mutate(beach_name = map_station()$beach_name) %>%
-      mutate(tide_corr = map_station()$low_correction) %>%
-      filter(between(tide_date, input$map_date_one, input$map_date_two)) %>%
-      mutate(beach_time = tide_time + tide_corr) %>%
-      mutate(char_date = format(tide_date)) %>%
-      mutate(beach_date = as.POSIXct(char_date, tz = "America/Los_Angeles")) %>%
-      mutate(beach_datetime = beach_date + minutes(beach_time)) %>%
-      mutate(beach_datetime = format(beach_datetime)) %>%
+      filter(between(tide_date, input$high_date_one, input$high_date_two)) %>%
       mutate(sunrise = strftime(sunrise, format = "%H:%M")) %>%
       mutate(sunset = strftime(sunset, format = "%H:%M")) %>%
-      select(tide_date, beach_name, tide_station, sea_tide_datetime, tide_time,
-             tide_corr, beach_time, char_date, beach_datetime, tide_height,
+      select(tide_date, station_name = tide_station, tide_time, tide_height,
              tide_strata, sunrise, sunset)
   })
 
+  # Pull out only needed locations....use multi-select here
+  multi_station = reactive({
+    beach_data %>%
+      filter(station_name %in% c("Port Townsend", "Seattle")) %>%
+      filter(beach_name %in% input$high_beach_select) %>%
+      left_join(high_low(), by = "station_name") %>%
+      mutate(beach_minutes = tide_time + low_correction) %>%
+      mutate(tide_date = as.POSIXct(format(tide_date), tz = "America/Los_Angeles")) %>%
+      mutate(low_tide = tide_date + minutes(beach_minutes)) %>%
+      mutate(low_tide = strftime(low_tide, format = "%H:%M")) %>%
+      mutate(station_tide = tide_date + minutes(tide_time)) %>%
+      mutate(station_tide = strftime(station_tide, format = "%H:%M")) %>%
+      mutate(high_tide_unit = input$high_tide_unit) %>%
+      mutate(tide_height = if_else(high_tide_unit == "meters",
+                                   tide_height / 3.28084, tide_height)) %>%
+      select(tide_date, beach = beach_name, beach_tide = low_tide,
+             sunrise, sunset, strata = tide_strata, station = station_name,
+             station_tide, station_height = tide_height, low_correction) %>%
+      filter(strata %in% input$high_strata) %>%
+      arrange(tide_date, beach, beach_tide) %>%
+      mutate(tide_date = strftime(tide_date, format = "%a %B %d, %Y"))
+  })
 
+  # Output daily predicted tides
+  output$high_low_report = renderDT({
+    high_low_title = glue("High and low tides ({input$high_tide_unit}) for selected beaches and strata")
+    # Generate table
+    datatable(multi_station(),
+              extensions = 'Buttons',
+              options = list(dom = 'Blftp',
+                             pageLength = 10,
+                             lengthMenu = c(5, 10, 20, 40, 60, 100, 500, 5000),
+                             scrollX = T,
+                             buttons = c('excel', 'print'),
+                             initComplete = JS(
+                               "function(settings, json) {",
+                               "$(this.api().table().header()).css({'background-color': '#9eb3d6'});",
+                               "}")),
+              caption = htmltools::tags$caption(
+                style = 'caption-side: top; text-align: left; color: black;',
+                'Table 2: ', htmltools::em(htmltools::strong(high_low_title))))
+  })
 
-
-  output$check_val = renderText(tz(input$map_date_one))
+  # output$check_val = renderText(map_location$map_beach[[1]])
   #output$check_val = renderText(unlist(start_pad()))
 
-  output$tides = renderTable(
-    map_high_low() %>%
-      mutate(tide_date = format(tide_date)) %>%
-      mutate(sea_tide_datetime = format(sea_tide_datetime))
-  )
-
   # output$tides = renderTable(
-  #   tide_pred() %>%
-  #     mutate(tide_datetime = format(tide_datetime))
+  #   map_high_low() %>%
+  #     mutate(tide_date = format(tide_date))
+  # )
+
+  # output$high = renderTable(
+  #   multi_station()
   # )
 
   # output$tides = renderTable(

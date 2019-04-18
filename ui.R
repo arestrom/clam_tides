@@ -31,7 +31,7 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
                                            dateInput(inputId = "map_date_two",
                                                      label = "To:",
                                                      format = "D M dd yyyy",
-                                                     value = Sys.Date()),
+                                                     value = Sys.Date() + 1),
                                            radioButtons(inputId = "map_tide_unit",
                                                         label = "Units",
                                                         choices = c("feet", "meters"),
@@ -54,22 +54,25 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
                                            ".shiny-output-error-validation {
                                            color: #1c3e75; font-weight: normal; font-size: 1.18em;}"
                                 ),
+
+                                # Style dygraph
+                                tags$style(type = "text/css",
+                                           ".dygraph-title {
+                                              font-size: 55%; font-weight: bold; font-style: italic;}"
+                                ),
+
                                 fluidRow(
 
-                                  column(width = 4,
+                                  column(width = 5,
                                          # map output height 655
-                                         leafletOutput("beach_map", height = 550),
-                                         br(),
-                                         div(DT::DTOutput("tide_report"), style = "font-size: 80%")
-
+                                         leafletOutput("beach_map", height = "655px")
                                   ),
                                   column(width = 7,
                                          verbatimTextOutput("check_val"),
-                                         dygraphOutput("tide_graph", height = "300px"),
+                                         dygraphOutput("tide_graph", height = "350px"),
                                          br(),
-                                         tableOutput("tides"),
                                          br(),
-                                         div(DT::DTOutput("map_high_low"), style = "font-size: 80%")
+                                         div(DT::DTOutput("tide_report"), style = "font-size: 80%")
 
                                   )
                                 )
@@ -80,23 +83,25 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
                             sidebarLayout(
                               sidebarPanel(width = 3,
                                      # Select primary tide stations in WA
-                                     selectizeInput(inputId = "out_beach_select",
-                                                    label = "High-Low for:",
+                                     selectizeInput(inputId = "high_beach_select",
+                                                    label = "High-Low tides for:",
                                                     multiple = TRUE,
-                                                    choices = beach_list,
-                                                    selected = "Seattle"),
-                                     dateRangeInput(inputId = "out_tide_range",
-                                                    label = "From (no limit)",
-                                                    format = "D M dd yyyy",
-                                                    start = paste0(format(Sys.Date(), format = "%Y"), "-03-01"),
-                                                    end = paste0(format(Sys.Date(), format = "%Y"), "-09-01"),
-                                                    min = "1970-01-01", max = "2056-12-31"),
-                                     radioButtons(inputId = "out_tide_unit",
+                                                    choices = high_beach_list,
+                                                    selected = "Port Townsend"),
+                                     dateInput(inputId = "high_date_one",
+                                               label = "From:",
+                                               format = "D M dd yyyy",
+                                               value = Sys.Date()),
+                                     dateInput(inputId = "high_date_two",
+                                               label = "To:",
+                                               format = "D M dd yyyy",
+                                               value = Sys.Date() + 1),
+                                     radioButtons(inputId = "high_tide_unit",
                                                   label = "Units",
-                                                  choices = c("Feet", "Meters"),
-                                                  selected = "Feet",
+                                                  choices = c("feet", "meters"),
+                                                  selected = "feet",
                                                   inline = TRUE),
-                                     selectizeInput(inputId = "out_strata",
+                                     selectizeInput(inputId = "high_strata",
                                                     label = "Tide strata",
                                                     multiple = TRUE,
                                                     choices = c("ELOW", "LOW", "HIGH", "PLUS", "XPLUS", "NIGHT"),
@@ -104,7 +109,8 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
                               ),
                               mainPanel(width = 9,
                                      # Table showing tide predictions
-                                     div(DT::DTOutput("tide_range_report"), style = "font-size: 80%")
+                                     # tableOutput("high"),
+                                     div(DT::DTOutput("high_low_report"), style = "font-size: 80%")
                               )
                             )
                    ),
