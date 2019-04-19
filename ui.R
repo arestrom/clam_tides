@@ -41,12 +41,12 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
                                                           label = "Time interval (minutes)",
                                                           choices = c(1, 6, 15, 30, 60),
                                                           selected = 15),
+                                           div(style="display:inline-block; text-align: center;",
+                                               img(src = "buster.jpg", width = "70%")),
                                            br(),
                                            br(),
-                                           img(src = "buster.jpg", width = "75%"),
-                                           br(),
-                                           br(),
-                                           img(src = "wdfw.png", width = "75%")
+                                           div(style="display:inline-block; text-align: center;",
+                                               img(src = "wdfw.png", width = "75%"))
                               ),
                               mainPanel(width = 10,
                                 # Style errors
@@ -65,10 +65,10 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
 
                                   column(width = 5,
                                          # map output height 655
-                                         leafletOutput("beach_map", height = "655px")
+                                         leafletOutput("beach_map", height = "660px")
                                   ),
                                   column(width = 7,
-                                         verbatimTextOutput("check_val"),
+                                         #verbatimTextOutput("check_val"),
                                          dygraphOutput("tide_graph", height = "350px"),
                                          br(),
                                          br(),

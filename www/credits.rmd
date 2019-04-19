@@ -1,0 +1,33 @@
+---
+title: "credits"
+author: "Are Strom"
+date: "April 9, 2019"
+output: html_document
+---  
+
+#### Credits  
+
+**R programming language:**
+
+*R Core Team (2018). R: A language and environment for statistical computing. R Foundation for Statistical Computing,
+  Vienna, Austria.*
+  
+**RStudio Shiny package:**
+
+*Winston Chang, Joe Cheng, JJ Allaire, Yihui Xie and Jonathan McPherson (2018). shiny: Web Application Framework for R. R
+  package version 1.2.0.*  
+
+**rtide**
+
+*Joe Thorley, Luke Miller and Abram Fleishman (2018). rtide: Tide Heights. R package version 0.0.5.* 
+
+**Seb Dalgarno**
+
+*rtide: A shiny app to download and view tide height predictions.*
+
+**David Flater**
+
+_NOAA web site harmonics data used in the rtide package were originally processed by David Flater for the **XTide** program._
+  
+  
+

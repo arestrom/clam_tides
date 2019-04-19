@@ -348,9 +348,11 @@ multi_station = multi_station %>%
   filter(tide_strata %in% selected_strata) %>%
   arrange(tide_date, beach, low_tide)
 
-
-
-
+# Test computing progress
+start_dt = as.Date("2019-04-18")
+end_dt = as.Date("2019-04-20")
+n_duration = interval(start_dt, end_dt)
+(n_minutes = as.integer(dminutes(n_duration) / 60))
 
 
 

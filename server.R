@@ -13,6 +13,7 @@
 #  1. Add station tide time to map_high_low...Done
 #  2. Add correction = zero to all stations lower than 200000...Done
 #  3. Test that output from stations compute correctly...Done
+#  4. Add progress bar. See: https://gallery.shinyapps.io/085-progress/
 #
 # AS 2019-04-18
 #===========================================================================================
@@ -161,7 +162,9 @@ shinyServer(function(input, output, session) {
 
   # Reactive for dygraph
   tide_plot = reactive({
-    graph_title = glue("Tide height ({input$map_tide_unit}) in {time_interval()} min increments for {input$map_beach_select}")
+    ref_station = tide_pred()$station_name[1]
+    graph_title = glue("Tide predictions in {time_interval()} min increments for {input$map_beach_select}. ",
+                       "Tide height ({input$map_tide_unit}) is for {ref_station} reference station.")
     dygraph(dy_input(), main = graph_title, height = "10px") %>%
       dyOptions(strokeWidth = 1.5, drawGrid = F, includeZero = F,
                 useDataTimezone = T, drawGapEdgePoints = T, rightGap = 15) %>%
@@ -175,21 +178,40 @@ shinyServer(function(input, output, session) {
 
   # Plot tides
   output$tide_graph <- renderDygraph({
+    # Calculate the number of rows in tide_data()
+    n_duration = interval(input$map_date_one, input$map_date_two)
+    n_minutes = as.integer(dminutes(n_duration)) / (3600 * 60)
+
+    # Set progress bar
+    progress = Progress$new(session, min = 1, max = n_minutes)
+    on.exit(progress$close())
+
+    # Just output message without bar for now
+    progress$set(message = 'Calculation in progress',
+                 detail = 'This may take a while...')
+
+    for (i in 1:n_minutes) {
+      progress$set(value = i)
+    }
     tide_plot()
   })
 
   tide_rep = reactive({
     tide_pred() %>%
-      mutate(beach_name = map_station()$station_name) %>%
+      mutate(station_name = map_station()$station_name) %>%
+      mutate(beach_name = map_station()$beach_name) %>%
       mutate(tide_date = strftime(tide_datetime, format = "%a %B %d, %Y")) %>%
       mutate(tide_time = strftime(tide_datetime, format = "%H:%M")) %>%
       mutate(tide_height = round(pred_height, 2)) %>%
-      select(tide_date, beach = beach_name, tide_time, tide_height)
+      select(tide_date, beach = beach_name, beach_tide = tide_time,
+             ref_station = station_name, ref_height = tide_height)
   })
 
   # Output daily predicted tides
   output$tide_report = renderDT({
-    tide_title = glue("Tide height ({input$map_tide_unit}) in {time_interval()} min increments for {input$map_beach_select}")
+    ref_station = tide_pred()$station_name[1]
+    tide_title = glue("Tide predictions in {time_interval()} min increments for {input$map_beach_select}. ",
+                       "Tide height ({input$map_tide_unit}) is for {ref_station} reference station.")
     # Generate table
     datatable(tide_rep(),
               extensions = 'Buttons',
@@ -204,7 +226,8 @@ shinyServer(function(input, output, session) {
                                "}")),
               caption = htmltools::tags$caption(
                 style = 'caption-side: top; text-align: left; color: black;',
-                'Table 1: ', htmltools::em(htmltools::strong(tide_title))))
+                'Table 1: ', htmltools::em(htmltools::strong(tide_title)))) %>%
+      formatRound("ref_height", 2)
   })
 
   # # Get highs and lows for map page
@@ -275,9 +298,10 @@ shinyServer(function(input, output, session) {
       mutate(high_tide_unit = input$high_tide_unit) %>%
       mutate(tide_height = if_else(high_tide_unit == "meters",
                                    tide_height / 3.28084, tide_height)) %>%
+      mutate(tide_height = round(tide_height, 2)) %>%
       select(tide_date, beach = beach_name, beach_tide = low_tide,
-             sunrise, sunset, strata = tide_strata, station = station_name,
-             station_tide, station_height = tide_height, low_correction) %>%
+             sunrise, sunset, strata = tide_strata, ref_station = station_name,
+             ref_tide = station_tide, ref_height = tide_height, low_correction) %>%
       filter(strata %in% input$high_strata) %>%
       arrange(tide_date, beach, beach_tide) %>%
       mutate(tide_date = strftime(tide_date, format = "%a %B %d, %Y"))
@@ -285,7 +309,9 @@ shinyServer(function(input, output, session) {
 
   # Output daily predicted tides
   output$high_low_report = renderDT({
-    high_low_title = glue("High and low tides ({input$high_tide_unit}) for selected beaches and strata")
+    high_low_title = glue("Time of high and low tides for selected beaches. ",
+                          "Strata were computed based on Seattle tides. Height ({input$high_tide_unit}) ",
+                          "is for the reference station")
     # Generate table
     datatable(multi_station(),
               extensions = 'Buttons',
@@ -300,7 +326,8 @@ shinyServer(function(input, output, session) {
                                "}")),
               caption = htmltools::tags$caption(
                 style = 'caption-side: top; text-align: left; color: black;',
-                'Table 2: ', htmltools::em(htmltools::strong(high_low_title))))
+                'Table 2: ', htmltools::em(htmltools::strong(high_low_title)))) %>%
+      formatRound("ref_height", 2)
   })
 
   # output$check_val = renderText(map_location$map_beach[[1]])
