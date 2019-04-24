@@ -1,10 +1,5 @@
 #=======================================================================================
 # Shiny app to predict tides
-#
-# Notes:
-#  1.
-#
-# AS 2019-04-11
 #=======================================================================================
 
 # Define UI for application that draws a histogram
@@ -14,10 +9,35 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
                    tabPanel("Tide plot",
                             sidebarLayout(
                               sidebarPanel(width = 2,
-
-                                           # # Set height of inputs
-                                           # tags$style(".shiny-input-container  {line-height: 5px; height : 25px}"),
-                                           # tags$style(".form-control  {height: 25px;}"),
+                                           # Set style for inputs
+                                           tags$style(type = "text/css",
+                                                      ".form-control {
+                                                       width: 100%; height: 24px;
+                                                       padding-top: 0px;
+                                                       padding-bottom: 0px;
+                                                       font-size: 12px;
+                                                       margin-bottom: 0px;}"),
+                                           tags$style(type = "text/css",
+                                                      "form-group.shiny-input-container {
+                                                       width: 100%;
+                                                       height: 24px;
+                                                       padding-top: 0px;
+                                                       padding-bottom: 0px;
+                                                       font-size: 12px;
+                                                       margin-bottom: 0px;}"),
+                                           tags$style(type = "text/css",
+                                                      ".selectize-input.items.full.has-options.has-items {
+                                                       font-size: 12px;
+                                                       min-height: 24px;
+                                                       padding-top: 0px;
+                                                       padding-bottom: 0px;
+                                                       margin-bottom: 0px;}"),
+                                           tags$style(type = "text/css",
+                                                      ".control-label {
+                                                       font-size: 12px;}"),
+                                           tags$style(type = "text/css",
+                                                      ".shiny-options-group {
+                                                       font-size: 12px;}"),
 
                                            # Select beach
                                            selectizeInput(inputId = "map_beach_select",
@@ -42,30 +62,38 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
                                                           choices = c(1, 6, 15, 30, 60),
                                                           selected = 15),
                                            div(style="display:inline-block; text-align: center;",
-                                               img(src = "buster.jpg", width = "70%")),
+                                               img(src = "buster.jpg", width = "65%")),
                                            br(),
                                            br(),
                                            div(style="display:inline-block; text-align: center;",
-                                               img(src = "wdfw.png", width = "75%"))
+                                               img(src = "wdfw.png", width = "65%"))
                               ),
                               mainPanel(width = 10,
+
                                 # Style errors
                                 tags$style(type = "text/css",
                                            ".shiny-output-error-validation {
-                                           color: #1c3e75; font-weight: normal; font-size: 1.18em;}"
-                                ),
-
+                                            color: #1c3e75;
+                                            font-weight: normal;
+                                            font-size: 1.18em;}"),
                                 # Style dygraph
                                 tags$style(type = "text/css",
                                            ".dygraph-title {
-                                              font-size: 55%; font-weight: bold; font-style: italic;}"
-                                ),
+                                            font-size: 55%;
+                                            font-weight: bold;
+                                            font-style: italic;}"),
+                                tags$style(type = "text/css",
+                                           ".dygraph-label  {
+                                            font-size: 12px;}"),
+                                tags$style(type = "text/css",
+                                           ".dygraph-axis-label {
+                                            font-size: 12px;}"),
 
                                 fluidRow(
 
                                   column(width = 5,
-                                         # map output height 655
-                                         leafletOutput("beach_map", height = "660px")
+                                         # map output height 625
+                                         leafletOutput("beach_map", height = "625px")
                                   ),
                                   column(width = 7,
                                          #verbatimTextOutput("check_val"),
@@ -124,7 +152,7 @@ shinyUI(navbarPage(theme = shinytheme("sandstone"),
                               ),
                               column(offset = 1,
                                      width = 8,
-                                     img(src = "diggers.jpg", width = "50%"),
+                                     img(src = "ocean_two.jpg", width = "60%"),
                                      br(),
                                      includeMarkdown("www/about.Rmd")
                               )

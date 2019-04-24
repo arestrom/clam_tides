@@ -3,7 +3,7 @@
 #===========================================================================================
 # Notes:
 #  1. Input to rtide::tide_height() must be class Date.
-#  2. as.Date() converts everything to UTC
+#  2. as.Date() converts everything to UTC....but you can set a tz
 #  3. Output from rtide::tide_height() is a POSIXct object in timezone tz
 #  4. Tested all meter to feet conversion values. Current five decimal
 #     value seems most appropriate to match noaa predictions. Only some
@@ -13,9 +13,9 @@
 #  1. Add station tide time to map_high_low...Done
 #  2. Add correction = zero to all stations lower than 200000...Done
 #  3. Test that output from stations compute correctly...Done
-#  4. Add progress bar. See: https://gallery.shinyapps.io/085-progress/
+#  4. Add progress bar. See: https://gallery.shinyapps.io/085-progress/...Done
 #
-# AS 2019-04-18
+# AS 2019-04-23
 #===========================================================================================
 
 # Server code
@@ -95,7 +95,9 @@ shinyServer(function(input, output, session) {
     req(input$map_date_two)
     validate(
       need(input$map_date_two >= input$map_date_one,
-           "Error: End date must be greater than or equal to the start date.")
+           "Error: End date must be greater than or equal to the start date."),
+      need(as.integer(input$map_date_two - input$map_date_one) < 30,
+           "Error: Please limit predictions to a 30 day span.")
     )
     rtide::tide_height(
       stations = map_station()$station_name,
@@ -178,6 +180,14 @@ shinyServer(function(input, output, session) {
 
   # Plot tides
   output$tide_graph <- renderDygraph({
+    req(input$map_date_one)
+    req(input$map_date_two)
+    validate(
+      need(input$map_date_two >= input$map_date_one,
+           "Error: End date must be greater than or equal to the start date."),
+      need(as.integer(input$map_date_two - input$map_date_one) < 30,
+           "Error: Please limit predictions to a 30 day span.")
+    )
     # Calculate the number of rows in tide_data()
     n_duration = interval(input$map_date_one, input$map_date_two)
     n_minutes = as.integer(dminutes(n_duration)) / (3600 * 60)
@@ -211,7 +221,7 @@ shinyServer(function(input, output, session) {
   output$tide_report = renderDT({
     ref_station = tide_pred()$station_name[1]
     tide_title = glue("Tide predictions in {time_interval()} min increments for {input$map_beach_select}. ",
-                       "Tide height ({input$map_tide_unit}) is for {ref_station} reference station.")
+                      "Tide height ({input$map_tide_unit}) is for {ref_station} reference station.")
     # Generate table
     datatable(tide_rep(),
               extensions = 'Buttons',
